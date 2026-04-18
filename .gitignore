@@ -1,0 +1,35 @@
+# Local development environments
+.pixi/
+.venv/
+venv/
+.env
+.env.*
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Project-local runtime artifacts
+.codex-temp/
+runtime/temp/
+runtime/outputs/
+*.log
+
+# Local model weights and caches
+models/
+
+# Windows noise
+Thumbs.db
+Desktop.ini
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# Upstream VoxCPM local clone caches
+VoxCPM/*
