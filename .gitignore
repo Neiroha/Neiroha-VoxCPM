@@ -31,5 +31,4 @@ Desktop.ini
 .vscode/
 .idea/
 
-# Upstream VoxCPM local clone caches
-VoxCPM/*
+# Upstream VoxCPM is tracked as a git submodule via .gitmodules

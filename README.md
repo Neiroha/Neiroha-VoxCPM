@@ -4,6 +4,7 @@
 
 - `pixi` 环境管理
 - 从 ModelScope 下载模型到项目本地 `./models`
+- 通过 Git submodule 引入官方 `OpenBMB/VoxCPM`
 - 官方 Gradio WebUI 启动脚本
 - 单独的 FastAPI 服务
 - OpenAI 风格兼容接口
@@ -38,10 +39,25 @@
 
 说明：
 
-- `VoxCPM/` 是当前本地克隆的上游官方仓库
+- `VoxCPM/` 通过 Git submodule 固定到官方上游 `https://github.com/OpenBMB/VoxCPM.git`
 - `models/`、`runtime/`、`.pixi/` 都属于本地运行资产，不应直接提交
 
 ## 快速开始
+
+### 0. 拉取仓库与子模块
+
+首次克隆时建议直接带上 submodule：
+
+```powershell
+git clone --recurse-submodules https://github.com/neiroha/<repo-name>.git
+cd <repo-name>
+```
+
+如果已经克隆了外层仓库，再执行一次：
+
+```powershell
+git submodule update --init --recursive
+```
 
 ### 1. 安装环境
 
@@ -137,14 +153,17 @@ pixi run combined-asr
 https://github.com/neiroha/<repo-name>.git
 ```
 
-推送前请注意一件事：
+当前仓库采用的就是推荐方案：
 
-当前 `VoxCPM/` 目录本身还是一个独立 Git 仓库，里面有自己的 `.git`。这意味着外层仓库在第一次 `git add .` 之前，需要先决定采用哪种方式：
+- 外层仓库只维护本地启动器、`pixi` 环境和 API 封装
+- 官方 `VoxCPM/` 通过 Git submodule 固定到上游仓库
+- 模型、缓存、运行时输出不进入版本控制
 
-1. 保持 `VoxCPM/` 为上游子模块风格
-2. 去掉 `VoxCPM/.git`，把上游代码作为普通目录一并纳入外层仓库
+如果后续要更新官方上游，可以使用：
 
-如果目标是发布一个“可复现的本地启动器整合仓库”，通常更推荐先确认许可证要求，再决定是否保留为子模块。
+```powershell
+git submodule update --remote --init VoxCPM
+```
 
 ## 注意事项
 
