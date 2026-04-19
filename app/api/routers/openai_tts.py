@@ -8,6 +8,8 @@ from app.api.common import audio_response, ensure_served_model, ensure_wav_only,
 from app.api.dependencies import get_runtime, get_voice_registry
 from app.core.registry import VoiceRegistry
 from app.core.schemas import OpenAITTSSpeechRequest
+from app.core.utils import copy_model, first_non_empty
+from app.services.audio_sources import materialize_audio_sources
 from app.services.synthesis_service import VoxCPMRuntime, build_openai_request
 
 LOGGER = logging.getLogger("voxcpm.launcher")
@@ -59,10 +61,37 @@ def openai_audio_speech(
     registry: VoiceRegistry = Depends(get_voice_registry),
 ):
     try:
-        ensure_served_model(payload.model, runtime)
-        ensure_wav_only(payload.response_format or payload.format or "wav")
-        request = build_openai_request(payload, runtime, registry)
-        sample_rate, wav = runtime.synthesize(request)
+        reference_audio = first_non_empty(
+            payload.reference_audio,
+            payload.reference_audio_path,
+            payload.reference_wav_path,
+            payload.ref_audio,
+        )
+        prompt_audio = first_non_empty(
+            payload.prompt_audio,
+            payload.prompt_audio_path,
+            payload.prompt_wav_path,
+        )
+        with materialize_audio_sources(
+            reference_audio=reference_audio,
+            prompt_audio=prompt_audio,
+            reference_prefix="openai_reference",
+            prompt_prefix="openai_prompt",
+        ) as materialized:
+            request_payload = copy_model(
+                payload,
+                ref_audio=None,
+                reference_audio=materialized.reference_audio,
+                reference_audio_path=None,
+                reference_wav_path=None,
+                prompt_audio=materialized.prompt_audio,
+                prompt_audio_path=None,
+                prompt_wav_path=None,
+            )
+            ensure_served_model(request_payload.model, runtime)
+            ensure_wav_only(request_payload.response_format or request_payload.format or "wav")
+            request = build_openai_request(request_payload, runtime, registry)
+            sample_rate, wav = runtime.synthesize(request)
     except FileNotFoundError as exc:
         return openai_error(str(exc), status_code=404)
     except HTTPException as exc:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from app.api.common import served_model_aliases
 from app.api.dependencies import get_runtime, get_voice_registry
 from app.core.registry import VoiceRegistry
 from app.services.synthesis_service import OPENAI_COMPAT_MODEL_ID, VoxCPMRuntime, build_voxcpm_meta
@@ -37,21 +38,24 @@ def health(runtime: VoxCPMRuntime = Depends(get_runtime)) -> dict[str, str | boo
 
 @router.get("/v1/models")
 def list_models(runtime: VoxCPMRuntime = Depends(get_runtime)) -> dict[str, object]:
+    data: list[dict[str, object]] = []
+    for model_id in served_model_aliases(runtime):
+        entry: dict[str, object] = {
+            "id": model_id,
+            "object": "model",
+            "owned_by": "openbmb" if model_id == runtime.model_id else "local",
+        }
+        if model_id != runtime.model_id:
+            entry["root_model"] = runtime.model_id
+        if model_id == OPENAI_COMPAT_MODEL_ID:
+            entry["alias_type"] = "openai_compat"
+        elif model_id.lower() in {"voxcpm2", "openbmb/voxcpm2"}:
+            entry["alias_type"] = "vllm_omni_compat"
+        data.append(entry)
+
     return {
         "object": "list",
-        "data": [
-            {
-                "id": OPENAI_COMPAT_MODEL_ID,
-                "object": "model",
-                "owned_by": "local",
-                "root_model": runtime.model_id,
-            },
-            {
-                "id": runtime.model_id,
-                "object": "model",
-                "owned_by": "openbmb",
-            },
-        ],
+        "data": data,
     }
 
 

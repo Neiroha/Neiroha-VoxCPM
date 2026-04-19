@@ -30,7 +30,7 @@ class PreparedSynthesisRequest:
 class OpenAITTSSpeechRequest(APIBaseModel):
     model: Optional[str] = Field(
         default=None,
-        description="Optional model id. Accepts the local model path or voxcpm-openai-tts.",
+        description="Optional model id. Accepts the local model path, voxcpm-openai-tts, voxcpm2, or openbmb/VoxCPM2.",
     )
     input: Optional[str] = Field(default=None, description="Text to synthesize.")
     text: Optional[str] = Field(default=None, description="Alias of input.")
@@ -49,6 +49,10 @@ class OpenAITTSSpeechRequest(APIBaseModel):
     instructions: str = Field(default="", description="Alias of instruction.")
     control: str = Field(default="", description="Alias of instruction.")
     instruct_text: str = Field(default="", description="Alias of instruction.")
+    ref_audio: Optional[str] = Field(
+        default=None,
+        description="vLLM-Omni-compatible alias of reference_audio. Accepts local path, file:// URI, http(s) URL, or data URI.",
+    )
     reference_audio: Optional[str] = Field(default=None, description="Local reference audio path or file:// URI.")
     reference_audio_path: Optional[str] = Field(default=None, description="Alias of reference_audio.")
     reference_wav_path: Optional[str] = Field(default=None, description="Alias of reference_audio.")
@@ -56,6 +60,7 @@ class OpenAITTSSpeechRequest(APIBaseModel):
     prompt_audio_path: Optional[str] = Field(default=None, description="Alias of prompt_audio.")
     prompt_wav_path: Optional[str] = Field(default=None, description="Alias of prompt_audio.")
     prompt_text: str = Field(default="", description="Transcript that matches prompt_audio.")
+    ref_text: str = Field(default="", description="Compatibility alias of prompt_text.")
     reference_text: str = Field(default="", description="Alias of prompt_text.")
     transcript: str = Field(default="", description="Alias of prompt_text.")
     language: str = Field(default="", description="Optional compatibility field.")
@@ -72,7 +77,7 @@ class OpenAITTSSpeechRequest(APIBaseModel):
 class NativeSpeechRequest(APIBaseModel):
     model: Optional[str] = Field(
         default=None,
-        description="Optional model id. Accepts the local model path or voxcpm-openai-tts.",
+        description="Optional model id. Accepts the local model path, voxcpm-openai-tts, voxcpm2, or openbmb/VoxCPM2.",
     )
     text: Optional[str] = Field(default=None, description="Text to synthesize.")
     input: Optional[str] = Field(default=None, description="Alias of text.")
@@ -89,6 +94,10 @@ class NativeSpeechRequest(APIBaseModel):
     instructions: str = Field(default="", description="Alias of instruction.")
     control: str = Field(default="", description="Alias of instruction.")
     instruct_text: str = Field(default="", description="Alias of instruction.")
+    ref_audio: Optional[str] = Field(
+        default=None,
+        description="Compatibility alias of reference_audio. Accepts local path, file:// URI, http(s) URL, or data URI.",
+    )
     reference_audio: Optional[str] = Field(default=None, description="Local reference audio path or file:// URI.")
     reference_audio_path: Optional[str] = Field(default=None, description="Alias of reference_audio.")
     reference_wav_path: Optional[str] = Field(default=None, description="Alias of reference_audio.")
@@ -96,6 +105,7 @@ class NativeSpeechRequest(APIBaseModel):
     prompt_audio_path: Optional[str] = Field(default=None, description="Alias of prompt_audio.")
     prompt_wav_path: Optional[str] = Field(default=None, description="Alias of prompt_audio.")
     prompt_text: str = Field(default="", description="Transcript that matches prompt_audio.")
+    ref_text: str = Field(default="", description="Compatibility alias of prompt_text.")
     reference_text: str = Field(default="", description="Alias of prompt_text.")
     transcript: str = Field(default="", description="Alias of prompt_text.")
     language: str = Field(default="", description="Optional compatibility field.")

@@ -64,3 +64,9 @@ def dump_model(instance: Any) -> dict[str, Any]:
     if hasattr(instance, "model_dump"):
         return instance.model_dump()
     return instance.dict()
+
+
+def copy_model(instance: Any, **updates: Any) -> Any:
+    if hasattr(instance, "model_copy"):
+        return instance.model_copy(update=updates)
+    return instance.copy(update=updates)

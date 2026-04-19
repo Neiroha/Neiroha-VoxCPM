@@ -11,6 +11,8 @@ from app.api.dependencies import get_runtime, get_voice_registry
 from app.core.config import UPLOAD_TEMP_DIR
 from app.core.registry import VoiceRegistry
 from app.core.schemas import NativeSpeechRequest
+from app.core.utils import copy_model, first_non_empty
+from app.services.audio_sources import materialize_audio_sources
 from app.services.synthesis_service import VoxCPMRuntime, build_native_request
 
 LOGGER = logging.getLogger("voxcpm.launcher")
@@ -47,10 +49,37 @@ def synthesize_native_payload(
     registry: VoiceRegistry,
 ):
     try:
-        ensure_served_model(payload.model, runtime)
-        ensure_wav_only(payload.response_format or payload.format or "wav")
-        request = build_native_request(payload, runtime, registry)
-        sample_rate, wav = runtime.synthesize(request)
+        reference_audio = first_non_empty(
+            payload.reference_audio,
+            payload.reference_audio_path,
+            payload.reference_wav_path,
+            payload.ref_audio,
+        )
+        prompt_audio = first_non_empty(
+            payload.prompt_audio,
+            payload.prompt_audio_path,
+            payload.prompt_wav_path,
+        )
+        with materialize_audio_sources(
+            reference_audio=reference_audio,
+            prompt_audio=prompt_audio,
+            reference_prefix="native_reference",
+            prompt_prefix="native_prompt",
+        ) as materialized:
+            request_payload = copy_model(
+                payload,
+                ref_audio=None,
+                reference_audio=materialized.reference_audio,
+                reference_audio_path=None,
+                reference_wav_path=None,
+                prompt_audio=materialized.prompt_audio,
+                prompt_audio_path=None,
+                prompt_wav_path=None,
+            )
+            ensure_served_model(request_payload.model, runtime)
+            ensure_wav_only(request_payload.response_format or request_payload.format or "wav")
+            request = build_native_request(request_payload, runtime, registry)
+            sample_rate, wav = runtime.synthesize(request)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except HTTPException:
@@ -88,11 +117,13 @@ def native_generate_upload(
     instruction: str | None = Form(None),
     instructions: str | None = Form(None),
     control: str | None = Form(None),
+    ref_audio: str | None = Form(None),
     reference_audio_path: str | None = Form(None),
     prompt_audio_path: str | None = Form(None),
     reference_audio: UploadFile | None = File(None),
     prompt_audio: UploadFile | None = File(None),
     prompt_text: str | None = Form(None),
+    ref_text: str | None = Form(None),
     reference_text: str | None = Form(None),
     transcript: str | None = Form(None),
     language: str | None = Form(None),
@@ -127,6 +158,7 @@ def native_generate_upload(
             instructions=instructions or "",
             control=control or "",
             instruct_text="",
+            ref_audio=ref_audio,
             reference_audio=temp_reference_audio or reference_audio_path,
             reference_audio_path=None,
             reference_wav_path=None,
@@ -134,6 +166,7 @@ def native_generate_upload(
             prompt_audio_path=None,
             prompt_wav_path=None,
             prompt_text=prompt_text or "",
+            ref_text=ref_text or "",
             reference_text=reference_text or "",
             transcript=transcript or "",
             language=language or "",

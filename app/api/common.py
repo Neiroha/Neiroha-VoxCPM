@@ -1,12 +1,38 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse, Response
 
 from app.core.utils import strip_text
 from app.services.synthesis_service import OPENAI_COMPAT_MODEL_ID, VoxCPMRuntime
+
+
+def served_model_aliases(runtime: VoxCPMRuntime) -> list[str]:
+    aliases: list[str] = []
+    seen: set[str] = set()
+
+    def add(value: str | None) -> None:
+        text = strip_text(value)
+        if not text:
+            return
+        lowered = text.lower()
+        if lowered in seen:
+            return
+        seen.add(lowered)
+        aliases.append(text)
+
+    add(OPENAI_COMPAT_MODEL_ID)
+    add(runtime.model_id)
+
+    runtime_name = Path(runtime.model_id).name.lower()
+    if "voxcpm2" in runtime.model_id.lower() or "voxcpm2" in runtime_name:
+        add("voxcpm2")
+        add("openbmb/VoxCPM2")
+
+    return aliases
 
 
 def audio_response(*, sample_rate: int, wav, model_id: str, filename: str = "speech.wav") -> Response:
@@ -43,10 +69,15 @@ def openai_error(
 
 def ensure_served_model(requested_model: str | None, runtime: VoxCPMRuntime) -> None:
     requested = strip_text(requested_model)
-    if requested and requested not in {runtime.model_id, OPENAI_COMPAT_MODEL_ID}:
+    accepted = {alias.lower() for alias in served_model_aliases(runtime)}
+    if requested and requested.lower() not in accepted:
         raise HTTPException(
             status_code=400,
-            detail=f"This launcher currently serves {runtime.model_id} and the alias {OPENAI_COMPAT_MODEL_ID}.",
+            detail=(
+                "This launcher currently serves the following model ids: "
+                + ", ".join(served_model_aliases(runtime))
+                + "."
+            ),
         )
 
 

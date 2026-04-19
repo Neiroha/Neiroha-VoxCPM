@@ -386,13 +386,14 @@ def build_openai_request(
             payload.reference_audio,
             payload.reference_audio_path,
             payload.reference_wav_path,
+            payload.ref_audio,
         ),
         prompt_wav_path_input=first_non_empty(
             payload.prompt_audio,
             payload.prompt_audio_path,
             payload.prompt_wav_path,
         ),
-        prompt_text=first_non_empty(payload.prompt_text, payload.reference_text, payload.transcript),
+        prompt_text=first_non_empty(payload.prompt_text, payload.ref_text, payload.reference_text, payload.transcript),
     )
 
     return runtime.prepare_synthesis_request(
@@ -434,13 +435,14 @@ def build_native_request(
             payload.reference_audio,
             payload.reference_audio_path,
             payload.reference_wav_path,
+            payload.ref_audio,
         ),
         prompt_wav_path_input=first_non_empty(
             payload.prompt_audio,
             payload.prompt_audio_path,
             payload.prompt_wav_path,
         ),
-        prompt_text=first_non_empty(payload.prompt_text, payload.reference_text, payload.transcript),
+        prompt_text=first_non_empty(payload.prompt_text, payload.ref_text, payload.reference_text, payload.transcript),
     )
 
     return runtime.prepare_synthesis_request(
@@ -467,6 +469,7 @@ def build_voxcpm_meta(runtime: VoxCPMRuntime, registry: VoiceRegistry) -> dict[s
         "provider": "voxcpm",
         "model": runtime.model_id,
         "openai_model_alias": OPENAI_COMPAT_MODEL_ID,
+        "model_aliases": [OPENAI_COMPAT_MODEL_ID, "voxcpm2", "openbmb/VoxCPM2"],
         "asr_enabled": runtime.asr_enabled,
         "asr_model_source": runtime.asr_model_source,
         "supported_modes": [
