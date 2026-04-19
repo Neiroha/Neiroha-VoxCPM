@@ -282,6 +282,17 @@ OpenAI 兼容请求：
 
 - `Content-Type: audio/wav`
 - 响应体直接是音频字节
+- `X-VoxCPM-Model`：最终命中的本地模型 ID
+- `X-VoxCPM-Sample-Rate`：输出采样率
+- `X-VoxCPM-Audio-Seconds`：生成音频时长，单位秒
+- `X-VoxCPM-Output-Bytes`：最终 WAV 载荷大小，单位字节
+- `X-VoxCPM-Synthesis-Seconds`：合成阶段墙钟耗时，单位秒
+- `X-VoxCPM-RTF`：实时率，计算方式为 `synthesis_seconds / audio_seconds`
+
+说明：
+
+- `X-VoxCPM-Synthesis-Seconds` 只统计请求归一化完成之后的合成阶段。
+- 上传保存、远程 `ref_audio` 下载、以及响应回传不计入这个指标。
 
 ## 推荐使用方式
 

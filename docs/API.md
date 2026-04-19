@@ -282,6 +282,17 @@ The server responds with:
 
 - `Content-Type: audio/wav`
 - raw audio bytes in the body
+- `X-VoxCPM-Model`: resolved local model id
+- `X-VoxCPM-Sample-Rate`: output sample rate
+- `X-VoxCPM-Audio-Seconds`: generated audio duration in seconds
+- `X-VoxCPM-Output-Bytes`: final WAV payload size in bytes
+- `X-VoxCPM-Synthesis-Seconds`: synthesis wall time in seconds
+- `X-VoxCPM-RTF`: real-time factor, calculated as `synthesis_seconds / audio_seconds`
+
+Notes:
+
+- `X-VoxCPM-Synthesis-Seconds` measures only the synthesis step after the request has been normalized.
+- upload handling, remote `ref_audio` download, and response streaming are not included in that metric.
 
 ## Recommendation
 

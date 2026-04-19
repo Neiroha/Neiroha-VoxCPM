@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 import tempfile
 from pathlib import Path
+from time import perf_counter
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from app.api.common import audio_response, ensure_served_model, ensure_wav_only
+from app.api.common import audio_metrics, audio_response, ensure_served_model, ensure_wav_only
 from app.api.dependencies import get_runtime, get_voice_registry
 from app.core.config import UPLOAD_TEMP_DIR
 from app.core.registry import VoiceRegistry
@@ -48,6 +49,7 @@ def synthesize_native_payload(
     runtime: VoxCPMRuntime,
     registry: VoiceRegistry,
 ):
+    synthesis_seconds = None
     try:
         reference_audio = first_non_empty(
             payload.reference_audio,
@@ -79,7 +81,9 @@ def synthesize_native_payload(
             ensure_served_model(request_payload.model, runtime)
             ensure_wav_only(request_payload.response_format or request_payload.format or "wav")
             request = build_native_request(request_payload, runtime, registry)
+            started_at = perf_counter()
             sample_rate, wav = runtime.synthesize(request)
+            synthesis_seconds = perf_counter() - started_at
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except HTTPException:
@@ -90,7 +94,20 @@ def synthesize_native_payload(
         LOGGER.exception("Native synthesis failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return audio_response(sample_rate=sample_rate, wav=wav, model_id=runtime.model_id)
+    metrics = audio_metrics(sample_rate=sample_rate, wav=wav, synthesis_seconds=synthesis_seconds)
+    LOGGER.info(
+        "Synthesis completed | synth_seconds=%.2fs | audio_seconds=%.2fs | RTF=%.4f",
+        metrics.get("synthesis_seconds", 0.0),
+        metrics["audio_seconds"],
+        metrics.get("rtf", 0.0),
+    )
+
+    return audio_response(
+        sample_rate=sample_rate,
+        wav=wav,
+        model_id=runtime.model_id,
+        synthesis_seconds=synthesis_seconds,
+    )
 
 
 @router.post("/voxcpm/speech", summary="Generate speech with native VoxCPM JSON API")

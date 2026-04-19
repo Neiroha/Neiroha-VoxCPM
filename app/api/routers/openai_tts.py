@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+from time import perf_counter
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.common import audio_response, ensure_served_model, ensure_wav_only, openai_error
+from app.api.common import audio_metrics, audio_response, ensure_served_model, ensure_wav_only, openai_error
 from app.api.dependencies import get_runtime, get_voice_registry
 from app.core.registry import VoiceRegistry
 from app.core.schemas import OpenAITTSSpeechRequest
@@ -60,6 +61,7 @@ def openai_audio_speech(
     runtime: VoxCPMRuntime = Depends(get_runtime),
     registry: VoiceRegistry = Depends(get_voice_registry),
 ):
+    synthesis_seconds = None
     try:
         reference_audio = first_non_empty(
             payload.reference_audio,
@@ -91,7 +93,9 @@ def openai_audio_speech(
             ensure_served_model(request_payload.model, runtime)
             ensure_wav_only(request_payload.response_format or request_payload.format or "wav")
             request = build_openai_request(request_payload, runtime, registry)
+            started_at = perf_counter()
             sample_rate, wav = runtime.synthesize(request)
+            synthesis_seconds = perf_counter() - started_at
     except FileNotFoundError as exc:
         return openai_error(str(exc), status_code=404)
     except HTTPException as exc:
@@ -102,4 +106,17 @@ def openai_audio_speech(
         LOGGER.exception("OpenAI-compatible synthesis failed")
         return openai_error(str(exc), status_code=500, error_type="server_error")
 
-    return audio_response(sample_rate=sample_rate, wav=wav, model_id=runtime.model_id)
+    metrics = audio_metrics(sample_rate=sample_rate, wav=wav, synthesis_seconds=synthesis_seconds)
+    LOGGER.info(
+        "Synthesis completed | synth_seconds=%.2fs | audio_seconds=%.2fs | RTF=%.4f",
+        metrics.get("synthesis_seconds", 0.0),
+        metrics["audio_seconds"],
+        metrics.get("rtf", 0.0),
+    )
+
+    return audio_response(
+        sample_rate=sample_rate,
+        wav=wav,
+        model_id=runtime.model_id,
+        synthesis_seconds=synthesis_seconds,
+    )
