@@ -57,10 +57,24 @@ API only:
 pixi run api
 ```
 
+Default API task uses `--no-optimize`, because on this Windows setup it benchmarked faster than `torch.compile` for typical VoxCPM requests.
+
+API with optimization enabled explicitly:
+
+```powershell
+pixi run api-optimize
+```
+
 API with ASR:
 
 ```powershell
 pixi run api-asr
+```
+
+API with ASR and optimization enabled explicitly:
+
+```powershell
+pixi run api-asr-optimize
 ```
 
 WebUI only:

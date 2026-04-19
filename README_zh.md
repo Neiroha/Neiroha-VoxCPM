@@ -51,10 +51,24 @@ pixi run install-asr
 pixi run api
 ```
 
+默认 API task 会带 `--no-optimize`，因为在当前这套 Windows 环境里，它对典型 VoxCPM 请求的实测速度比 `torch.compile` 更稳更快。
+
+显式启用优化的 API：
+
+```powershell
+pixi run api-optimize
+```
+
 启用 ASR 的 API：
 
 ```powershell
 pixi run api-asr
+```
+
+显式启用优化的 ASR API：
+
+```powershell
+pixi run api-asr-optimize
 ```
 
 只启动 WebUI：

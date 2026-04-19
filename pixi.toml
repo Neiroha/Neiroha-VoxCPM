@@ -23,6 +23,7 @@ python-multipart = ">=0.0.20,<1"
 torch = { url = "https://mirrors.aliyun.com/pytorch-wheels/cu128/torch-2.7.0%2Bcu128-cp312-cp312-win_amd64.whl" }
 torchaudio = { url = "https://mirrors.aliyun.com/pytorch-wheels/cu128/torchaudio-2.7.0%2Bcu128-cp312-cp312-win_amd64.whl" }
 torchvision = { url = "https://mirrors.aliyun.com/pytorch-wheels/cu128/torchvision-0.22.0%2Bcu128-cp312-cp312-win_amd64.whl" }
+triton-windows = "==3.3.0a0.post11"
 
 [tasks]
 install = { cmd = "python scripts/download_modelscope_model.py --model-id OpenBMB/VoxCPM2" }
@@ -30,8 +31,10 @@ install-asr = { cmd = "python scripts/download_modelscope_model.py --model-id ii
 adopt-asr-cache = { cmd = "python scripts/adopt_modelscope_cache.py --model-id iic/SenseVoiceSmall" }
 webui = { cmd = "python scripts/launch_voxcpm.py --mode webui --model-id models/OpenBMB__VoxCPM2 --port 7860" }
 webui-asr = { cmd = "python scripts/launch_voxcpm.py --mode webui --model-id models/OpenBMB__VoxCPM2 --port 7860 --enable-asr --asr-model-id models/iic__SenseVoiceSmall" }
-api = { cmd = "python scripts/launch_voxcpm.py --mode api --model-id models/OpenBMB__VoxCPM2 --port 8000 --preload-model"  }
-api-asr = { cmd = "python scripts/launch_voxcpm.py --mode api --model-id models/OpenBMB__VoxCPM2 --port 8000 --preload-model --enable-asr --asr-model-id models/iic__SenseVoiceSmall"  }
+api = { cmd = "python scripts/launch_voxcpm.py --mode api --model-id models/OpenBMB__VoxCPM2 --port 8000 --preload-model --no-optimize"  }
+api-optimize = { cmd = "python scripts/launch_voxcpm.py --mode api --model-id models/OpenBMB__VoxCPM2 --port 8000 --preload-model"  }
+api-asr = { cmd = "python scripts/launch_voxcpm.py --mode api --model-id models/OpenBMB__VoxCPM2 --port 8000 --preload-model --no-optimize --enable-asr --asr-model-id models/iic__SenseVoiceSmall"  }
+api-asr-optimize = { cmd = "python scripts/launch_voxcpm.py --mode api --model-id models/OpenBMB__VoxCPM2 --port 8000 --preload-model --enable-asr --asr-model-id models/iic__SenseVoiceSmall"  }
 combined = { cmd = "python scripts/launch_voxcpm.py --mode combined --model-id models/OpenBMB__VoxCPM2 --port 7860" }
 combined-asr = { cmd = "python scripts/launch_voxcpm.py --mode combined --model-id models/OpenBMB__VoxCPM2 --port 7860 --enable-asr --asr-model-id models/iic__SenseVoiceSmall" }
 launcher-help = { cmd = "python scripts/launch_voxcpm.py --help" }
