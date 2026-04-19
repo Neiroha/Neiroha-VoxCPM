@@ -1,4 +1,5 @@
 [workspace]
+authors = ["Neiroha Team"]
 name = "voxcpm-local"
 channels = ["conda-forge"]
 platforms = ["win-64"]

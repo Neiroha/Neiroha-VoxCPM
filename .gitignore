@@ -18,6 +18,10 @@ __pycache__/
 .codex-temp/
 runtime/temp/
 runtime/outputs/
+runtime/cache/
+runtime/logs/
+runtime/voices/*
+!runtime/voices/.gitkeep
 *.log
 
 # Local model weights and caches

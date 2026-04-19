@@ -1,0 +1,163 @@
+from __future__ import annotations
+
+import logging
+import tempfile
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+from app.api.common import audio_response, ensure_served_model, ensure_wav_only
+from app.api.dependencies import get_runtime, get_voice_registry
+from app.core.config import UPLOAD_TEMP_DIR
+from app.core.registry import VoiceRegistry
+from app.core.schemas import NativeSpeechRequest
+from app.services.synthesis_service import VoxCPMRuntime, build_native_request
+
+LOGGER = logging.getLogger("voxcpm.launcher")
+router = APIRouter(tags=["voxcpm"])
+
+
+def save_uploaded_audio(uploaded_audio: UploadFile | None, *, prefix: str) -> str | None:
+    if uploaded_audio is None or not uploaded_audio.filename:
+        return None
+    suffix = Path(uploaded_audio.filename).suffix or ".wav"
+    with tempfile.NamedTemporaryFile(
+        delete=False,
+        dir=UPLOAD_TEMP_DIR,
+        prefix=f"{prefix}_",
+        suffix=suffix,
+    ) as tmp:
+        tmp.write(uploaded_audio.file.read())
+        return tmp.name
+
+
+def cleanup_temp_file(path: str | None) -> None:
+    if not path:
+        return
+    try:
+        Path(path).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def synthesize_native_payload(
+    payload: NativeSpeechRequest,
+    *,
+    runtime: VoxCPMRuntime,
+    registry: VoiceRegistry,
+):
+    try:
+        ensure_served_model(payload.model, runtime)
+        ensure_wav_only(payload.response_format or payload.format or "wav")
+        request = build_native_request(payload, runtime, registry)
+        sample_rate, wav = runtime.synthesize(request)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        LOGGER.exception("Native synthesis failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return audio_response(sample_rate=sample_rate, wav=wav, model_id=runtime.model_id)
+
+
+@router.post("/voxcpm/speech", summary="Generate speech with native VoxCPM JSON API")
+@router.post("/voxcpm/generate", include_in_schema=False)
+def native_generate(
+    payload: NativeSpeechRequest,
+    runtime: VoxCPMRuntime = Depends(get_runtime),
+    registry: VoiceRegistry = Depends(get_voice_registry),
+):
+    return synthesize_native_payload(payload, runtime=runtime, registry=registry)
+
+
+@router.post("/voxcpm/speech/upload", summary="Generate speech with uploaded reference or prompt audio")
+def native_generate_upload(
+    model: str | None = Form(None),
+    text: str = Form(...),
+    input: str | None = Form(None),
+    mode: str | None = Form(None),
+    voice_id: str | None = Form(None),
+    profile: str | None = Form(None),
+    character_name: str | None = Form(None),
+    speaker: str | None = Form(None),
+    voice: str | None = Form(None),
+    instruction: str | None = Form(None),
+    instructions: str | None = Form(None),
+    control: str | None = Form(None),
+    reference_audio_path: str | None = Form(None),
+    prompt_audio_path: str | None = Form(None),
+    reference_audio: UploadFile | None = File(None),
+    prompt_audio: UploadFile | None = File(None),
+    prompt_text: str | None = Form(None),
+    reference_text: str | None = Form(None),
+    transcript: str | None = Form(None),
+    language: str | None = Form(None),
+    auto_asr: bool = Form(False),
+    speed: float = Form(1.0),
+    response_format: str = Form("wav"),
+    cfg_value: float = Form(2.0),
+    inference_timesteps: int = Form(10),
+    normalize: bool = Form(False),
+    denoise: bool = Form(False),
+    runtime: VoxCPMRuntime = Depends(get_runtime),
+    registry: VoiceRegistry = Depends(get_voice_registry),
+):
+    temp_reference_audio = None
+    temp_prompt_audio = None
+
+    try:
+        temp_reference_audio = save_uploaded_audio(reference_audio, prefix="reference")
+        temp_prompt_audio = save_uploaded_audio(prompt_audio, prefix="prompt")
+
+        payload = NativeSpeechRequest(
+            model=model,
+            text=text,
+            input=input,
+            mode=mode,
+            voice_id=voice_id,
+            profile=profile,
+            character_name=character_name,
+            speaker=speaker,
+            voice=voice,
+            instruction=instruction or "",
+            instructions=instructions or "",
+            control=control or "",
+            instruct_text="",
+            reference_audio=temp_reference_audio or reference_audio_path,
+            reference_audio_path=None,
+            reference_wav_path=None,
+            prompt_audio=temp_prompt_audio or prompt_audio_path,
+            prompt_audio_path=None,
+            prompt_wav_path=None,
+            prompt_text=prompt_text or "",
+            reference_text=reference_text or "",
+            transcript=transcript or "",
+            language=language or "",
+            auto_asr=auto_asr,
+            speed=speed,
+            response_format=response_format,
+            format="",
+            cfg_value=cfg_value,
+            inference_timesteps=inference_timesteps,
+            normalize=normalize,
+            denoise=denoise,
+        )
+        return synthesize_native_payload(payload, runtime=runtime, registry=registry)
+    finally:
+        cleanup_temp_file(temp_reference_audio)
+        cleanup_temp_file(temp_prompt_audio)
+
+
+@router.post("/api/v1/tts/voxcpm", include_in_schema=False)
+@router.post("/api/tts/voxcpm", include_in_schema=False)
+@router.post("/api/tts", include_in_schema=False)
+def legacy_native_generate(
+    payload: NativeSpeechRequest,
+    runtime: VoxCPMRuntime = Depends(get_runtime),
+    registry: VoiceRegistry = Depends(get_voice_registry),
+):
+    return synthesize_native_payload(payload, runtime=runtime, registry=registry)
