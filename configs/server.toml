@@ -1,0 +1,27 @@
+[api]
+host = "127.0.0.1"
+port = 8000
+reload = false
+
+[admin]
+enabled = true
+host = "127.0.0.1"
+port = 7860
+share = false
+
+[startup]
+surface = "both"
+preload_model = true
+default_model_preset = "voxcpm2-default"
+
+[security]
+api_key = ""
+
+[ui]
+title = "Neiroha VoxCPM Admin"
+default_language = "zh"
+
+[runtime]
+active_model_preset = "voxcpm2-default"
+active_voice_set = "default"
+default_voice = "voxcpm2-design"

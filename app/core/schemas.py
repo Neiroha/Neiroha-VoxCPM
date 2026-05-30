@@ -124,16 +124,31 @@ class NativeSpeechRequest(APIBaseModel):
 
 class VoiceProfileCreateRequest(APIBaseModel):
     id: str = Field(description="Unique local voice id.")
+    name: str | None = Field(default=None, description="Alias of display_name.")
     display_name: str | None = Field(default=None, description="Human-readable voice name.")
     engine: str = Field(default="torch_native", description="Engine hint for future multi-engine support.")
     model: str | None = Field(default=None, description="Model hint for this voice profile.")
+    voice_set: str | None = Field(default=None, description="Voice set id exposed as OpenAI model.")
+    model_preset: str | None = Field(default=None, description="Underlying VoxCPM model preset id.")
+    mode: str | None = Field(default=None, description="Suggested mode, such as design, clone, or ultimate_clone.")
     mode_hint: str | None = Field(default=None, description="Suggested mode, such as preset_voice or reference_with_text.")
     audio_path: str | None = Field(default=None, description="Reference audio path or file:// URI.")
+    reference_audio: str | None = Field(default=None, description="Alias of audio_path.")
     reference_audio_path: str | None = Field(default=None, description="Alias of audio_path.")
+    prompt_audio: str | None = Field(default=None, description="Alias of prompt_audio_path.")
     prompt_audio_path: str | None = Field(default=None, description="Prompt audio path or file:// URI.")
     prompt_text: str = Field(default="", description="Transcript that matches the prompt audio.")
     instruction: str = Field(default="", description="Default style instruction for this voice.")
     language: str = Field(default="", description="Optional language hint.")
+    text_lang: str = Field(default="", description="Text language hint.")
+    prompt_lang: str = Field(default="", description="Prompt language hint.")
+    description: str = Field(default="", description="Human-readable profile description.")
+    speed: float = Field(default=1.0)
+    cfg_value: float = Field(default=2.0)
+    inference_timesteps: int = Field(default=10)
+    normalize: bool = Field(default=False)
+    denoise: bool = Field(default=False)
+    engine_options: dict[str, Any] = Field(default_factory=dict)
     sample_rate: int | None = Field(default=None, description="Optional sample rate override.")
     copy_audio_to_registry: bool = Field(
         default=False,
@@ -144,14 +159,28 @@ class VoiceProfileCreateRequest(APIBaseModel):
 class VoiceProfile(APIBaseModel):
     id: str
     display_name: str
-    engine: str
-    model: str
+    engine: str = "torch_native"
+    model: str = "default"
+    voice_set: str = "default"
+    model_preset: str = "voxcpm2-default"
     mode_hint: str | None = None
+    mode: str = ""
     audio_path: str | None = None
+    reference_audio: str | None = None
     prompt_audio_path: str | None = None
+    prompt_audio: str | None = None
     prompt_text: str = ""
     instruction: str = ""
     language: str = ""
+    text_lang: str = ""
+    prompt_lang: str = ""
+    description: str = ""
+    speed: float = 1.0
+    cfg_value: float = 2.0
+    inference_timesteps: int = 10
+    normalize: bool = False
+    denoise: bool = False
+    engine_options: dict[str, Any] = Field(default_factory=dict)
     sample_rate: int | None = None
-    created_at: str
-    updated_at: str
+    created_at: str = ""
+    updated_at: str = ""

@@ -9,8 +9,8 @@ Single-page API reference for the local VoxCPM launcher.
 This server exposes three groups of routes:
 
 - OpenAI-compatible TTS routes
-- native VoxCPM routes
-- local voice registry routes
+- native VoxCPM routes under `/api/voxcpm/...`
+- TOML voice set / voice profile registry routes
 
 The current FastAPI entrypoint is assembled in `app/api/main.py`, while request normalization and mode mapping are handled in `app/services/synthesis_service.py`.
 
@@ -41,13 +41,23 @@ Default local API address:
 http://127.0.0.1:8000
 ```
 
-## Model IDs
+## Model IDs And Config Semantics
 
-Accepted model ids for TTS requests:
+For the OpenAI-compatible route, `model` means voice set. The default mapping is:
+
+- `model=default` -> `configs/voice-sets/default.toml`
+- `voice=voxcpm2-design` -> `runtime/voices/voxcpm2-design/voice.toml`
+- `voice=voxcpm2-clone` -> `runtime/voices/voxcpm2-clone/voice.toml`
+- `voice=voxcpm2-ultimate-clone` -> `runtime/voices/voxcpm2-ultimate-clone/voice.toml`
+- underlying VoxCPM2 weights -> `configs/model-presets/default.toml`
+
+Legacy model ids remain accepted for compatibility:
 
 - `voxcpm2`
 - `openbmb/VoxCPM2`
 - `voxcpm-openai-tts`
+- `tts-1`
+- `tts-1-hd`
 - the exact local model id used by the launcher, such as `models/OpenBMB__VoxCPM2`
 
 Query available ids:
@@ -62,7 +72,13 @@ Query available ids:
 - `GET /health`
 - `GET /api/health`
 - `GET /v1/models`
-- `GET /voxcpm/meta`
+- `GET /api/voxcpm/models`
+- `GET /api/voxcpm/capabilities`
+- `GET /api/voxcpm/meta`
+- `GET /api/voxcpm/logs`
+- `POST /api/voxcpm/load`
+- `POST /api/voxcpm/unload`
+- `POST /api/voxcpm/reload`
 
 ### OpenAI-Compatible TTS
 
@@ -73,20 +89,22 @@ Query available ids:
 
 ### Native VoxCPM
 
-- `POST /voxcpm/speech`
-- `POST /voxcpm/generate`
-- `POST /voxcpm/speech/upload`
+- `POST /api/voxcpm/tts`
+- `POST /api/voxcpm/tts/upload`
 - aliases:
+  - `POST /voxcpm/speech`
+  - `POST /voxcpm/generate`
+  - `POST /voxcpm/speech/upload`
   - `POST /api/v1/tts/voxcpm`
   - `POST /api/tts/voxcpm`
   - `POST /api/tts`
 
 ### Voice Registry
 
-- `GET /voxcpm/voices`
-- `POST /voxcpm/voices`
-- `GET /voxcpm/voices/{voice_id}`
-- `DELETE /voxcpm/voices/{voice_id}`
+- `GET /api/voxcpm/voices`
+- `POST /api/voxcpm/voices`
+- `GET /api/voxcpm/voices/{voice_id}`
+- `DELETE /api/voxcpm/voices/{voice_id}`
 
 ## Mode Model
 
@@ -145,7 +163,7 @@ Recommended client behavior:
 ```bash
 curl -X POST http://localhost:8000/v1/audio/speech \
   -H "Content-Type: application/json" \
-  -d "{\"model\": \"voxcpm2\", \"input\": \"Hello, this is VoxCPM2.\", \"voice\": \"default\"}" \
+  -d "{\"model\": \"default\", \"input\": \"Hello, this is VoxCPM2.\", \"voice\": \"voxcpm2-design\"}" \
   --output output.wav
 ```
 
@@ -153,7 +171,7 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 
 ```json
 {
-  "model": "voxcpm2",
+  "model": "default",
   "input": "This should sound like the reference speaker.",
   "voice": "default",
   "ref_audio": "data:audio/wav;base64,...",
@@ -199,7 +217,7 @@ The OpenAI route also accepts local extension fields:
 
 ### Upload API
 
-`POST /voxcpm/speech/upload` accepts multipart form fields:
+`POST /api/voxcpm/tts/upload` accepts multipart form fields:
 
 - `text`
 - `mode`
@@ -213,10 +231,10 @@ Uploaded files are temporary and are cleaned up after the request finishes. They
 
 ## Voice Registry
 
-Voice profiles live under:
+Voice profiles default to TOML:
 
 ```text
-runtime/voices/<voice_id>/
+runtime/voices/<voice_id>/voice.toml
 ```
 
 ### Create or Update
@@ -235,13 +253,13 @@ runtime/voices/<voice_id>/
 ### List
 
 ```bash
-curl http://localhost:8000/voxcpm/voices
+curl http://localhost:8000/api/voxcpm/voices
 ```
 
 ### Delete
 
 ```bash
-curl -X DELETE http://localhost:8000/voxcpm/voices/taichi_cn_01
+curl -X DELETE http://localhost:8000/api/voxcpm/voices/taichi_cn_01
 ```
 
 ### Reuse a Registered Voice
@@ -250,7 +268,7 @@ OpenAI-compatible request:
 
 ```json
 {
-  "model": "voxcpm2",
+  "model": "default",
   "input": "Read this with the registered voice.",
   "voice": "taichi_cn_01"
 }
@@ -269,7 +287,7 @@ Native request:
 ## Deletion Semantics
 
 - temporary uploaded audio is deleted automatically after the request
-- registered voices must be deleted with `DELETE /voxcpm/voices/{voice_id}`
+- registered voices must be deleted with `DELETE /api/voxcpm/voices/{voice_id}`
 - on Windows, physical directory cleanup may be delayed by file locks, but the voice is logically deleted immediately
 
 ## Response Format
@@ -288,6 +306,16 @@ The server responds with:
 - `X-VoxCPM-Output-Bytes`: final WAV payload size in bytes
 - `X-VoxCPM-Synthesis-Seconds`: synthesis wall time in seconds
 - `X-VoxCPM-RTF`: real-time factor, calculated as `synthesis_seconds / audio_seconds`
+- `X-Neiroha-Backend`: backend slug, currently `voxcpm`
+- `X-Neiroha-Model-Preset`: active model preset id
+- `X-Neiroha-Voice`: resolved voice id
+- `X-Neiroha-Sample-Rate`: output sample rate
+- `X-Neiroha-Inference-Ms`: synthesis wall time in milliseconds
+- `X-Neiroha-Output-Format`: output format
+- `X-Neiroha-Output-Path`: header-safe path to the copy written under `runtime/outputs`
+- `X-Neiroha-Audio-Seconds`
+- `X-Neiroha-Elapsed-Seconds`
+- `X-Neiroha-RTF`
 
 Notes:
 
@@ -304,3 +332,18 @@ Use the native routes when you need:
 - explicit mode control
 - voice registry management
 - clearer local-only semantics
+
+## Error Shape
+
+JSON errors use a stable Neiroha shape:
+
+```json
+{
+  "error": {
+    "code": "unsupported_format",
+    "message": "Only response_format='wav' is currently supported by this launcher.",
+    "details": {},
+    "type": "invalid_request_error"
+  }
+}
+```

@@ -327,6 +327,7 @@ def _apply_registered_voice(
     *,
     voice_name: str,
     registry: VoiceRegistry,
+    model_id: str | None,
     mode: Optional[str],
     control_instruction: str,
     reference_wav_path_input: Optional[str],
@@ -343,9 +344,14 @@ def _apply_registered_voice(
             "prompt_wav_path_input": prompt_wav_path_input,
             "prompt_text": prompt_text,
             "voice_name": normalized_voice,
+            "speed": None,
+            "cfg_value": None,
+            "inference_timesteps": None,
+            "normalize": None,
+            "denoise": None,
         }
 
-    profile = registry.get_optional_profile(normalized_voice)
+    profile = registry.get_optional_profile(normalized_voice, model_id=model_id or "")
     if profile is None:
         if resolved_mode in {"preset_voice", "preset-voice"}:
             raise ValueError(f"voice_id '{normalized_voice}' is not registered.")
@@ -356,10 +362,15 @@ def _apply_registered_voice(
             "prompt_wav_path_input": prompt_wav_path_input,
             "prompt_text": prompt_text,
             "voice_name": normalized_voice,
+            "speed": None,
+            "cfg_value": None,
+            "inference_timesteps": None,
+            "normalize": None,
+            "denoise": None,
         }
 
     return {
-        "mode": first_non_empty(mode, profile.mode_hint),
+        "mode": first_non_empty(mode, profile.mode_hint, profile.mode),
         "control_instruction": first_non_empty(control_instruction, profile.instruction),
         "reference_wav_path_input": first_non_empty(reference_wav_path_input, registry.resolve_audio_path(profile.audio_path)),
         "prompt_wav_path_input": first_non_empty(
@@ -368,7 +379,19 @@ def _apply_registered_voice(
         ),
         "prompt_text": first_non_empty(prompt_text, profile.prompt_text),
         "voice_name": profile.id,
+        "speed": profile.speed,
+        "cfg_value": profile.cfg_value,
+        "inference_timesteps": profile.inference_timesteps,
+        "normalize": profile.normalize,
+        "denoise": profile.denoise,
     }
+
+
+def _payload_fields_set(payload: Any) -> set[str]:
+    fields = getattr(payload, "model_fields_set", None)
+    if fields is not None:
+        return set(fields)
+    return set(getattr(payload, "__fields_set__", set()))
 
 
 def build_openai_request(
@@ -380,6 +403,7 @@ def build_openai_request(
     voice_inputs = _apply_registered_voice(
         voice_name=voice_name,
         registry=registry,
+        model_id=payload.model,
         mode=payload.mode,
         control_instruction=first_non_empty(payload.instructions, payload.instruction, payload.control, payload.instruct_text),
         reference_wav_path_input=first_non_empty(
@@ -395,6 +419,7 @@ def build_openai_request(
         ),
         prompt_text=first_non_empty(payload.prompt_text, payload.ref_text, payload.reference_text, payload.transcript),
     )
+    fields_set = _payload_fields_set(payload)
 
     return runtime.prepare_synthesis_request(
         text_input=first_non_empty(payload.input, payload.text),
@@ -405,11 +430,13 @@ def build_openai_request(
         prompt_text=voice_inputs["prompt_text"],
         auto_asr=payload.auto_asr,
         response_format=first_non_empty(payload.response_format, payload.format, "wav"),
-        cfg_value_input=payload.cfg_value,
-        do_normalize=payload.normalize,
-        denoise=payload.denoise,
-        inference_timesteps=payload.inference_timesteps,
-        speed=payload.speed,
+        cfg_value_input=payload.cfg_value if "cfg_value" in fields_set else (voice_inputs["cfg_value"] or payload.cfg_value),
+        do_normalize=payload.normalize if "normalize" in fields_set else bool(voice_inputs["normalize"]),
+        denoise=payload.denoise if "denoise" in fields_set else bool(voice_inputs["denoise"]),
+        inference_timesteps=payload.inference_timesteps
+        if "inference_timesteps" in fields_set
+        else (voice_inputs["inference_timesteps"] or payload.inference_timesteps),
+        speed=payload.speed if "speed" in fields_set else (voice_inputs["speed"] or payload.speed),
         voice_name=voice_inputs["voice_name"],
     )
 
@@ -429,6 +456,7 @@ def build_native_request(
     voice_inputs = _apply_registered_voice(
         voice_name=voice_name,
         registry=registry,
+        model_id=payload.model,
         mode=payload.mode,
         control_instruction=first_non_empty(payload.instructions, payload.instruction, payload.control, payload.instruct_text),
         reference_wav_path_input=first_non_empty(
@@ -444,6 +472,7 @@ def build_native_request(
         ),
         prompt_text=first_non_empty(payload.prompt_text, payload.ref_text, payload.reference_text, payload.transcript),
     )
+    fields_set = _payload_fields_set(payload)
 
     return runtime.prepare_synthesis_request(
         text_input=first_non_empty(payload.text, payload.input),
@@ -454,11 +483,13 @@ def build_native_request(
         prompt_text=voice_inputs["prompt_text"],
         auto_asr=payload.auto_asr,
         response_format=first_non_empty(payload.response_format, payload.format, "wav"),
-        cfg_value_input=payload.cfg_value,
-        do_normalize=payload.normalize,
-        denoise=payload.denoise,
-        inference_timesteps=payload.inference_timesteps,
-        speed=payload.speed,
+        cfg_value_input=payload.cfg_value if "cfg_value" in fields_set else (voice_inputs["cfg_value"] or payload.cfg_value),
+        do_normalize=payload.normalize if "normalize" in fields_set else bool(voice_inputs["normalize"]),
+        denoise=payload.denoise if "denoise" in fields_set else bool(voice_inputs["denoise"]),
+        inference_timesteps=payload.inference_timesteps
+        if "inference_timesteps" in fields_set
+        else (voice_inputs["inference_timesteps"] or payload.inference_timesteps),
+        speed=payload.speed if "speed" in fields_set else (voice_inputs["speed"] or payload.speed),
         voice_name=voice_inputs["voice_name"],
     )
 
@@ -470,6 +501,9 @@ def build_voxcpm_meta(runtime: VoxCPMRuntime, registry: VoiceRegistry) -> dict[s
         "model": runtime.model_id,
         "openai_model_alias": OPENAI_COMPAT_MODEL_ID,
         "model_aliases": [OPENAI_COMPAT_MODEL_ID, "voxcpm2", "openbmb/VoxCPM2"],
+        "active_model_preset": registry.active_model_preset_id(),
+        "active_voice_set": registry.active_voice_set_id(),
+        "default_voice": registry.default_voice_id(),
         "asr_enabled": runtime.asr_enabled,
         "asr_model_source": runtime.asr_model_source,
         "supported_modes": [
@@ -497,11 +531,19 @@ def build_voxcpm_meta(runtime: VoxCPMRuntime, registry: VoiceRegistry) -> dict[s
             "openai_models": "/v1/models",
             "openai_voices": "/v1/audio/voices",
             "openai_speech": "/v1/audio/speech",
-            "native_json": "/voxcpm/speech",
-            "native_upload": "/voxcpm/speech/upload",
-            "voice_registry": "/voxcpm/voices",
-            "meta": "/voxcpm/meta",
+            "native_json": "/api/voxcpm/tts",
+            "native_upload": "/api/voxcpm/tts/upload",
+            "voice_registry": "/api/voxcpm/voices",
+            "meta": "/api/voxcpm/meta",
+            "logs": "/api/voxcpm/logs",
+            "legacy_native_json": "/voxcpm/speech",
+            "legacy_voice_registry": "/voxcpm/voices",
         },
+        "model_presets": [preset.to_native_model() for preset in registry.list_model_presets()],
+        "voice_sets": [
+            voice_set.to_openai_model(len(registry.list_profiles(voice_set.id)))
+            for voice_set in registry.list_voice_sets()
+        ],
         "voice_registry": {
             "root": "runtime/voices",
             "count": len(registered_voices),

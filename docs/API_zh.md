@@ -9,8 +9,8 @@
 服务当前暴露三组接口：
 
 - OpenAI 兼容 TTS 接口
-- VoxCPM 原生接口
-- 本地 voice registry 接口
+- `/api/voxcpm/...` 下的 VoxCPM 原生接口
+- TOML voice set / voice profile registry 接口
 
 FastAPI 入口由 `app/api/main.py` 组装，请求归一化和 mode 映射由 `app/services/synthesis_service.py` 负责。
 
@@ -41,13 +41,23 @@ FastAPI 入口由 `app/api/main.py` 组装，请求归一化和 mode 映射由 `
 http://127.0.0.1:8000
 ```
 
-## 模型名
+## 模型名与配置语义
 
-TTS 请求当前接受这些模型名：
+OpenAI 兼容接口中，`model` 表示 voice set。默认本地配置为：
+
+- `model=default` -> `configs/voice-sets/default.toml`
+- `voice=voxcpm2-design` -> `runtime/voices/voxcpm2-design/voice.toml`
+- `voice=voxcpm2-clone` -> `runtime/voices/voxcpm2-clone/voice.toml`
+- `voice=voxcpm2-ultimate-clone` -> `runtime/voices/voxcpm2-ultimate-clone/voice.toml`
+- 底层 VoxCPM2 权重 -> `configs/model-presets/default.toml`
+
+为兼容旧客户端，TTS 请求仍接受这些 legacy 模型名：
 
 - `voxcpm2`
 - `openbmb/VoxCPM2`
 - `voxcpm-openai-tts`
+- `tts-1`
+- `tts-1-hd`
 - 启动器实际加载的本地模型 id，比如 `models/OpenBMB__VoxCPM2`
 
 可通过下面接口查询：
@@ -62,7 +72,13 @@ TTS 请求当前接受这些模型名：
 - `GET /health`
 - `GET /api/health`
 - `GET /v1/models`
-- `GET /voxcpm/meta`
+- `GET /api/voxcpm/models`
+- `GET /api/voxcpm/capabilities`
+- `GET /api/voxcpm/meta`
+- `GET /api/voxcpm/logs`
+- `POST /api/voxcpm/load`
+- `POST /api/voxcpm/unload`
+- `POST /api/voxcpm/reload`
 
 ### OpenAI 兼容 TTS
 
@@ -73,20 +89,22 @@ TTS 请求当前接受这些模型名：
 
 ### VoxCPM 原生接口
 
-- `POST /voxcpm/speech`
-- `POST /voxcpm/generate`
-- `POST /voxcpm/speech/upload`
+- `POST /api/voxcpm/tts`
+- `POST /api/voxcpm/tts/upload`
 - 兼容别名：
+  - `POST /voxcpm/speech`
+  - `POST /voxcpm/generate`
+  - `POST /voxcpm/speech/upload`
   - `POST /api/v1/tts/voxcpm`
   - `POST /api/tts/voxcpm`
   - `POST /api/tts`
 
 ### Voice Registry
 
-- `GET /voxcpm/voices`
-- `POST /voxcpm/voices`
-- `GET /voxcpm/voices/{voice_id}`
-- `DELETE /voxcpm/voices/{voice_id}`
+- `GET /api/voxcpm/voices`
+- `POST /api/voxcpm/voices`
+- `GET /api/voxcpm/voices/{voice_id}`
+- `DELETE /api/voxcpm/voices/{voice_id}`
 
 ## Mode 模型
 
@@ -145,7 +163,7 @@ TTS 请求当前接受这些模型名：
 ```bash
 curl -X POST http://localhost:8000/v1/audio/speech \
   -H "Content-Type: application/json" \
-  -d "{\"model\": \"voxcpm2\", \"input\": \"Hello, this is VoxCPM2.\", \"voice\": \"default\"}" \
+  -d "{\"model\": \"default\", \"input\": \"Hello, this is VoxCPM2.\", \"voice\": \"voxcpm2-design\"}" \
   --output output.wav
 ```
 
@@ -153,7 +171,7 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 
 ```json
 {
-  "model": "voxcpm2",
+  "model": "default",
   "input": "This should sound like the reference speaker.",
   "voice": "default",
   "ref_audio": "data:audio/wav;base64,...",
@@ -199,7 +217,7 @@ OpenAI 路由还支持这些扩展字段：
 
 ### 上传接口
 
-`POST /voxcpm/speech/upload` 支持 multipart 表单字段：
+`POST /api/voxcpm/tts/upload` 支持 multipart 表单字段：
 
 - `text`
 - `mode`
@@ -213,10 +231,10 @@ OpenAI 路由还支持这些扩展字段：
 
 ## Voice Registry
 
-voice profile 默认保存在：
+voice profile 默认保存为 TOML：
 
 ```text
-runtime/voices/<voice_id>/
+runtime/voices/<voice_id>/voice.toml
 ```
 
 ### 创建或更新
@@ -235,13 +253,13 @@ runtime/voices/<voice_id>/
 ### 查询列表
 
 ```bash
-curl http://localhost:8000/voxcpm/voices
+curl http://localhost:8000/api/voxcpm/voices
 ```
 
 ### 删除
 
 ```bash
-curl -X DELETE http://localhost:8000/voxcpm/voices/taichi_cn_01
+curl -X DELETE http://localhost:8000/api/voxcpm/voices/taichi_cn_01
 ```
 
 ### 复用已注册音色
@@ -250,7 +268,7 @@ OpenAI 兼容请求：
 
 ```json
 {
-  "model": "voxcpm2",
+  "model": "default",
   "input": "请用已注册音色读这句话。",
   "voice": "taichi_cn_01"
 }
@@ -269,7 +287,7 @@ OpenAI 兼容请求：
 ## 删除语义
 
 - 临时上传音频会在请求完成后自动删除
-- 已注册音色必须通过 `DELETE /voxcpm/voices/{voice_id}` 删除
+- 已注册音色必须通过 `DELETE /api/voxcpm/voices/{voice_id}` 删除
 - 在 Windows 下如果遇到文件锁，物理目录删除可能延后，但逻辑删除会立即生效
 
 ## 返回格式
@@ -288,6 +306,16 @@ OpenAI 兼容请求：
 - `X-VoxCPM-Output-Bytes`：最终 WAV 载荷大小，单位字节
 - `X-VoxCPM-Synthesis-Seconds`：合成阶段墙钟耗时，单位秒
 - `X-VoxCPM-RTF`：实时率，计算方式为 `synthesis_seconds / audio_seconds`
+- `X-Neiroha-Backend`：后端标识，当前为 `voxcpm`
+- `X-Neiroha-Model-Preset`：当前 model preset id
+- `X-Neiroha-Voice`：解析后的 voice id
+- `X-Neiroha-Sample-Rate`：输出采样率
+- `X-Neiroha-Inference-Ms`：合成耗时，单位毫秒
+- `X-Neiroha-Output-Format`：输出格式
+- `X-Neiroha-Output-Path`：本次输出写入 `runtime/outputs` 的 header-safe 路径
+- `X-Neiroha-Audio-Seconds`
+- `X-Neiroha-Elapsed-Seconds`
+- `X-Neiroha-RTF`
 
 说明：
 
@@ -304,3 +332,18 @@ Neiroha 前端和通用 OpenAI 风格客户端，优先走 OpenAI 路由。
 - 更明确的 mode 控制
 - voice registry 管理
 - 更清晰的本地语义
+
+## 错误格式
+
+JSON 错误统一返回稳定结构：
+
+```json
+{
+  "error": {
+    "code": "unsupported_format",
+    "message": "Only response_format='wav' is currently supported by this launcher.",
+    "details": {},
+    "type": "invalid_request_error"
+  }
+}
+```
