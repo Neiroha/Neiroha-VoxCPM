@@ -1,0 +1,12 @@
+schema_version = 1
+id = "voxcpm2-default"
+name = "VoxCPM2 Default"
+engine = "voxcpm2"
+
+[voxcpm2]
+model_id = "models/OpenBMB__VoxCPM2"
+device = "auto"
+optimize = false
+load_denoiser = false
+enable_asr = false
+asr_model_id = "models/iic__SenseVoiceSmall"

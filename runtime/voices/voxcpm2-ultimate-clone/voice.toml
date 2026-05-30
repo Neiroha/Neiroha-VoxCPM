@@ -1,0 +1,20 @@
+schema_version = 1
+id = "voxcpm2-ultimate-clone"
+name = "VoxCPM2 Ultimate Clone"
+description = "Native VoxCPM2 prompt-text-guided high fidelity clone mode. Fill prompt_audio and prompt_text for a reusable local voice."
+mode = "ultimate_clone"
+model_preset = "voxcpm2-default"
+reference_audio = ""
+prompt_audio = ""
+prompt_text = ""
+text_lang = "auto"
+prompt_lang = "auto"
+instruction = ""
+language = ""
+speed = 1.0
+cfg_value = 2.0
+inference_timesteps = 10
+normalize = false
+denoise = false
+
+[engine_options]

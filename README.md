@@ -1,173 +1,151 @@
 # VoxCPM Local Launcher
 
-一个面向本地部署的 VoxCPM 封装工作区，提供：
+Local Windows-first launcher for `OpenBMB/VoxCPM`, with a decoupled FastAPI service, the upstream Gradio WebUI, and a small compatibility layer for OpenAI-style TTS clients.
 
-- `pixi` 环境管理
-- 从 ModelScope 下载模型到项目本地 `./models`
-- 通过 Git submodule 引入官方 `OpenBMB/VoxCPM`
-- 官方 Gradio WebUI 启动脚本
-- 单独的 FastAPI 服务
-- OpenAI 风格兼容接口
-- 可选 ASR，默认禁用，避免极致克隆时自动拉取或自动识别
+[中文说明](./README_zh.md) | [API Docs](./docs/API.md) | [API 文档](./docs/API_zh.md) | [Model Sources](./docs/model-sources.md)
 
-这个仓库的发布目标是 GitHub 组织账号 `neiroha`，而不是个人账号。
+## What This Repo Provides
 
-## 当前能力
+- `pixi` environment management
+- local model download into `./models`
+- upstream `OpenBMB/VoxCPM` as a git submodule
+- official Gradio WebUI launcher
+- standalone FastAPI server
+- config-driven `pixi run serve` entrypoint for API, Admin, or both
+- OpenAI-compatible `/v1/audio/speech`
+- native VoxCPM routes under `/api/voxcpm/...`
+- TOML voice sets and local voice profiles under `configs/` and `runtime/voices/`
+- compatibility with the `vllm-omni` VoxCPM2 example request shape
 
-- 默认主模型：`OpenBMB/VoxCPM2`
-- 默认 ASR 模型：`iic/SenseVoiceSmall`
-- 模型下载目录：`./models`
-- ModelScope 缓存目录：`./models/_modelscope_cache`
-- API-only 模式已经和官方 WebUI 解耦
-- 极致克隆默认要求手动提供 `prompt_text`
-- 只有服务端启用 `--enable-asr` 且请求里传 `auto_asr=true` 时，才会自动识别参考音频文本
+OpenAI-style `model=default` means a voice set, not the underlying VoxCPM2 weights. The native VoxCPM2 model path and runtime options live in `configs/model-presets/default.toml`. The default voice set preserves the three VoxCPM2 inference modes as file-backed profiles:
 
-## 目录结构
+- `voxcpm2-design`: text-only voice design
+- `voxcpm2-clone`: reference-audio controllable cloning
+- `voxcpm2-ultimate-clone`: `prompt_audio` + `prompt_text` high-fidelity cloning
 
-```text
-.
-├─ pixi.toml
-├─ pixi.lock
-├─ scripts/
-│  ├─ launch_voxcpm.py
-│  ├─ download_modelscope_model.py
-│  └─ adopt_modelscope_cache.py
-├─ models/
-├─ runtime/
-└─ VoxCPM/
-```
+## Quick Start
 
-说明：
-
-- `VoxCPM/` 通过 Git submodule 固定到官方上游 `https://github.com/OpenBMB/VoxCPM.git`
-- `models/`、`runtime/`、`.pixi/` 都属于本地运行资产，不应直接提交
-
-## 快速开始
-
-### 0. 拉取仓库与子模块
-
-首次克隆时建议直接带上 submodule：
+### 1. Clone With Submodules
 
 ```powershell
 git clone --recurse-submodules https://github.com/neiroha/<repo-name>.git
 cd <repo-name>
 ```
 
-如果已经克隆了外层仓库，再执行一次：
+If you already cloned the outer repo:
 
 ```powershell
 git submodule update --init --recursive
 ```
 
-### 1. 安装环境
+### 2. Install
 
 ```powershell
 pixi install
 ```
 
-### 2. 下载主模型
+### 3. Download the Main Model
 
 ```powershell
 pixi run install
 ```
 
-### 3. 可选下载或接管 ASR 模型
-
-如果直接从 ModelScope 下载：
+Optional ASR model:
 
 ```powershell
 pixi run install-asr
 ```
 
-如果 ASR 已经被官方 WebUI 下载到了用户缓存，可直接接管到本项目：
+### 4. Start the Service
+
+Default API + Neiroha Admin:
 
 ```powershell
-pixi run adopt-asr-cache
+pixi run serve
 ```
 
-### 4. 启动服务
-
-默认不启用 ASR：
+API only:
 
 ```powershell
-pixi run webui
 pixi run api
-pixi run combined
 ```
 
-启用本地 ASR：
+Ports, startup surface, preload behavior, and the default model preset come from `configs/server.toml` and `configs/model-presets/default.toml`; pixi tasks do not hardcode model paths or ports.
+
+Neiroha Admin only:
 
 ```powershell
-pixi run webui-asr
-pixi run api-asr
-pixi run combined-asr
+pixi run admin
 ```
 
-## API 路由
+For other startup surfaces or engine options, edit `configs/server.toml` and `configs/model-presets/default.toml`, or call `scripts/launch_engine.py --help` for one-off overrides.
 
-### 健康检查
+Contract checks:
 
-- `GET /health`
+```powershell
+pixi run test
+pixi run smoke
+```
 
-### OpenAI 兼容接口
+See all launcher options:
 
-- `GET /v1/models`
-- `GET /v1/audio/voices`
-- `POST /v1/audio/speech`
+```powershell
+python -B scripts/launch_engine.py --help
+```
 
-### 原生接口
+## Neiroha Front-End Integration
 
-- `GET /voxcpm/meta`
-- `POST /voxcpm/speech`
-- `POST /voxcpm/speech/upload`
-- 兼容别名：
-  - `/voxcpm/generate`
-  - `/api/v1/tts/voxcpm`
-  - `/api/tts/voxcpm`
-  - `/api/tts`
+For the Neiroha front-end, the recommended baseline is:
 
-## 三种生成模式
+- Base URL: `http://127.0.0.1:8000`
+- TTS endpoint: `POST /v1/audio/speech`
+- Voice list: `GET /v1/audio/voices`
+- Model id: `default`
 
-### 1. `design`
+Recommended request body:
 
-- 纯文本生成
-- 不需要参考音频
+```json
+{
+  "model": "default",
+  "input": "Hello from Neiroha.",
+  "voice": "default",
+  "response_format": "wav"
+}
+```
 
-### 2. `clone`
+For one-off voice cloning, send `ref_audio` or `reference_audio`.
 
-- 需要 `reference_audio`
-- 可选 `instruction` / `control`
+For reusable local speakers, create a voice profile with `POST /api/voxcpm/voices`, then call:
 
-### 3. `ultimate_clone`
+```json
+{
+  "model": "default",
+  "input": "Read this in the registered voice.",
+  "voice": "taichi_cn_01"
+}
+```
 
-- 需要目标文本
-- 需要 `prompt_text`
-- 需要 `prompt_audio` 或 `reference_audio`
-- 如果只传一个音频路径，服务端会把它同时当作 `reference_audio` 和 `prompt_audio`
+Legacy model ids `voxcpm2`, `openbmb/VoxCPM2`, and `voxcpm-openai-tts` remain accepted as compatibility aliases. Native routes are standardized under `/api/voxcpm/*`; legacy `/voxcpm/*` routes remain available.
 
-## 发布说明
-
-建议发布到 `neiroha` 组织下的新仓库，例如：
+## Repo Layout
 
 ```text
-https://github.com/neiroha/<repo-name>.git
+.
+├─ app/
+├─ configs/
+├─ docs/
+├─ models/
+├─ runtime/
+├─ scripts/
+├─ tests/
+├─ VoxCPM/
+└─ pixi.toml
 ```
 
-当前仓库采用的就是推荐方案：
+## Notes
 
-- 外层仓库只维护本地启动器、`pixi` 环境和 API 封装
-- 官方 `VoxCPM/` 通过 Git submodule 固定到上游仓库
-- 模型、缓存、运行时输出不进入版本控制
-
-如果后续要更新官方上游，可以使用：
-
-```powershell
-git submodule update --remote --init VoxCPM
-```
-
-## 注意事项
-
-- 仓库不会提交模型权重
-- 仓库不会提交运行期缓存、日志和测试音频
-- 如需重新生成极致克隆里的自动识别能力，请使用 `*-asr` 任务启动
-- 当前主要针对 Windows + CUDA + Pixi 工作流
+- model weights are not committed
+- runtime caches, outputs, logs, and local voices are not committed
+- model source and license notes live in [docs/model-sources.md](./docs/model-sources.md)
+- this repo currently targets Windows + CUDA + Pixi
+- API details live in one page: [docs/API.md](./docs/API.md)

@@ -17,11 +17,25 @@ __pycache__/
 # Project-local runtime artifacts
 .codex-temp/
 runtime/temp/
-runtime/outputs/
+runtime/outputs/*
+runtime/cache/*
+runtime/logs/*
+!runtime/outputs/.gitkeep
+!runtime/cache/.gitkeep
+!runtime/logs/.gitkeep
+runtime/voices/*
+!runtime/voices/.gitkeep
+!runtime/voices/voxcpm2-design/
+!runtime/voices/voxcpm2-design/voice.toml
+!runtime/voices/voxcpm2-clone/
+!runtime/voices/voxcpm2-clone/voice.toml
+!runtime/voices/voxcpm2-ultimate-clone/
+!runtime/voices/voxcpm2-ultimate-clone/voice.toml
 *.log
 
 # Local model weights and caches
-models/
+models/*
+!models/.gitkeep
 
 # Windows noise
 Thumbs.db

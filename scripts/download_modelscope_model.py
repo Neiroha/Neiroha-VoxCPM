@@ -7,13 +7,15 @@ from pathlib import Path
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ROOT = WORKSPACE_ROOT / "runtime"
+CACHE_ROOT = RUNTIME_ROOT / "cache"
 TEMP_DIR = RUNTIME_ROOT / "temp"
 MODELS_ROOT = WORKSPACE_ROOT / "models"
-CACHE_ROOT = MODELS_ROOT / "_modelscope_cache"
+MODELSCOPE_CACHE_ROOT = CACHE_ROOT / "modelscope"
 
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_ROOT.mkdir(parents=True, exist_ok=True)
 CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+MODELSCOPE_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
 
 os.environ.setdefault("TMPDIR", str(TEMP_DIR))
 os.environ.setdefault("TEMP", str(TEMP_DIR))
@@ -38,7 +40,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--cache-dir",
         type=Path,
-        default=CACHE_ROOT,
+        default=MODELSCOPE_CACHE_ROOT,
         help="Project-local ModelScope cache/lock directory. This avoids using the system default cache path.",
     )
     parser.add_argument(

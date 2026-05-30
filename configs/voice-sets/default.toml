@@ -1,0 +1,5 @@
+schema_version = 1
+id = "default"
+name = "Default"
+description = "Default VoxCPM2 voices exposed as OpenAI TTS models."
+voices = ["voxcpm2-design", "voxcpm2-clone", "voxcpm2-ultimate-clone"]
