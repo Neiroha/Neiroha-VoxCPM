@@ -3,7 +3,7 @@ param(
     [string]$OutputRoot = "",
     [string]$ArchiveName = "",
     [string]$BandizipPath = "",
-    [string]$VolumeSize = "4096MB",
+    [string]$VolumeSize = "2000MB",
     [ValidateRange(0, 9)]
     [int]$CompressionLevel = 5,
     [switch]$ExcludeAsr,
@@ -17,6 +17,8 @@ param(
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 chcp.com 65001 > $null
+
+$GitHubReleaseAssetLimitBytes = 2GB
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $RepoName = Split-Path $RepoRoot -Leaf
@@ -191,6 +193,54 @@ function Get-FirstArchivePart {
     throw "未找到生成的压缩包: $ArchivePath"
 }
 
+function Get-ArchiveParts {
+    $Parts = @(Get-ChildItem -Path $ArchiveRoot -File -Filter "$ArchiveName.7z*" | Sort-Object Name)
+    if (-not $Parts) {
+        throw "未找到生成的压缩包分卷: $ArchiveRoot"
+    }
+    return $Parts
+}
+
+function Assert-GitHubReleaseAssetSizes {
+    foreach ($Part in Get-ArchiveParts) {
+        if ($Part.Length -ge $GitHubReleaseAssetLimitBytes) {
+            throw "GitHub Release 单个资产必须小于 2 GiB，但 $($Part.Name) 是 $($Part.Length) bytes。请调小 -VolumeSize。"
+        }
+    }
+}
+
+function Write-ReleaseMetadata {
+    $Parts = Get-ArchiveParts
+    $ChecksumsPath = Join-Path $ArchiveRoot "SHA256SUMS.txt"
+    $ManifestPath = Join-Path $ArchiveRoot "RELEASE_ASSETS.md"
+
+    $ChecksumLines = foreach ($Part in $Parts) {
+        $Hash = Get-FileHash -LiteralPath $Part.FullName -Algorithm SHA256
+        "$($Hash.Hash.ToLowerInvariant())  $($Part.Name)"
+    }
+    Set-Content -LiteralPath $ChecksumsPath -Value $ChecksumLines -Encoding ASCII
+
+    $Manifest = @(
+        "# Release Assets",
+        "",
+        "Upload every file in this directory to the GitHub Release.",
+        "",
+        "- Archive format: split 7z",
+        "- Volume size: $VolumeSize",
+        "- GitHub Release limit: each asset must be smaller than 2 GiB",
+        "- First volume to open/extract: $($Parts[0].Name)",
+        "- Checksum file: SHA256SUMS.txt",
+        "",
+        "## Files",
+        ""
+    )
+    foreach ($Part in $Parts) {
+        $Manifest += ('- `{0}` ({1} bytes)' -f $Part.Name, $Part.Length)
+    }
+    $Manifest += '- `SHA256SUMS.txt`'
+    Set-Content -LiteralPath $ManifestPath -Value $Manifest -Encoding ASCII
+}
+
 $Bandizip = Resolve-Bandizip -ExplicitPath $BandizipPath
 
 Assert-RepoPath ".pixi\envs\default\python.exe" | Out-Null
@@ -313,6 +363,9 @@ Write-Host "测试压缩包完整性..."
 if ($LASTEXITCODE -ne 0) {
     throw "Bandizip 完整性测试失败，退出码: $LASTEXITCODE"
 }
+
+Assert-GitHubReleaseAssetSizes
+Write-ReleaseMetadata
 
 if (-not $SkipExtract) {
     Write-Host ""
