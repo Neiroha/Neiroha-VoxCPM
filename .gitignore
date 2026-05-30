@@ -16,6 +16,7 @@ __pycache__/
 
 # Project-local runtime artifacts
 .codex-temp/
+dist/
 runtime/temp/
 runtime/outputs/*
 runtime/cache/*
